@@ -1,0 +1,77 @@
+// App.js
+import React, { useEffect, useState } from 'react';
+import Web3 from 'web3';
+import SupplyChainABI from './abis/SupplyChain.json';
+
+function App() {
+  const [account, setAccount] = useState('');
+  const [contract, setContract] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('');
+
+  useEffect(() => {
+    loadBlockchainData();
+  }, []);
+
+  const loadBlockchainData = async () => {
+    if (window.ethereum) {
+      const web3 = new Web3(window.ethereum);
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = await web3.eth.getAccounts();
+      setAccount(accounts[0]);
+
+      const networkId = await web3.eth.net.getId();
+      const networkData = SupplyChainABI.networks[networkId];
+      if (networkData) {
+        const scContract = new web3.eth.Contract(SupplyChainABI.abi, networkData.address);
+        setContract(scContract);
+        const orderList = await scContract.methods.getOrders().call();
+        setOrders(orderList);
+      } else {
+        alert('Smart contract not deployed to this network');
+      }
+    }
+  };
+
+  const createOrder = async () => {
+    if (contract && name && quantity) {
+      await contract.methods.createOrder(name, quantity).send({ from: account });
+      const updatedOrders = await contract.methods.getOrders().call();
+      setOrders(updatedOrders);
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Blockchain Supply Chain</h1>
+      <div className="mb-4">
+        <input
+          className="border p-2 mr-2"
+          placeholder="Tên sản phẩm"
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="border p-2 mr-2"
+          type="number"
+          placeholder="Số lượng"
+          onChange={(e) => setQuantity(e.target.value)}
+        />
+        <button className="bg-blue-500 text-white px-4 py-2" onClick={createOrder}>
+          Tạo đơn hàng
+        </button>
+      </div>
+
+      <h2 className="text-lg font-semibold mb-2">Danh sách đơn hàng</h2>
+      <ul>
+        {orders.map((order, index) => (
+          <li key={index} className="border-b py-2">
+            {order.name} - Số lượng: {order.quantity} - Trạng thái: {order.status}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default App;
